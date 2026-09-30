@@ -1,37 +1,72 @@
-# import struct
-# st = struct.pack('>H', 1023)
-# st2 = struct.unpack('>H', st)
-# print(st)
-# print(st2)
+import struct
 
-# st = struct.pack('>HIQ', 1023, 1023, 1023)
-# st2 = struct.unpack('>HIQ', st)
-# print(st)
-# print(st2)
+ENDIAN = '>'
+UNSIGNED_CHAR = 'B'
+TYPE_STR, TYPE_INT = 2, 3
 
-# st = struct.pack('>H', [10, 20])
-# print(st)
+def _pack_each_text(text):
+    numbers = []
+    type_ = TYPE_INT
+    if isinstance(text, str):
+        type_ = TYPE_STR
+    for ch in text:
+        numbers.append(ord(ch))
+    length = len(numbers)
+    print(length)
+    length_ = UNSIGNED_CHAR * length
+    packer = struct.pack(f'{ENDIAN}HH{length_}', length, type_, *numbers)
 
-# st = struct.pack('>HH', 1023, 1023)
-# print(st)
+    # for byte in numbers:
+    #     packer2 = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', byte)
+    #     print(byte, packer2)
+    #     packer = packer + packer2
+    return packer
 
-# st = struct.pack('>H', 1000000),
-# print(st)
+def encode_str(name, key ,value):
+    encoder = _pack_each_text(name) + _pack_each_text(key) + _pack_each_text(value)
+    return encoder
 
-# import codecs
-# cd = codecs.encode('hello', 'utf-8')
-# print(cd)
-# print(struct.calcsize(cd))
-# cd_un = struct.unpack('>Q', cd)
+class Database:
+    def __init__(self, path):
+        self.path = path
 
-# import struct, codecs
-# st = struct.pack('>H', 100)
-# print(st)
-# decode = codecs.decode(st, 'utf-8')
-# decode2 = st.decode()
-# print(decode)
-# print(decode2)
+    def collection(self, name):
+        return Collection(self, name)
 
-string = 'hello'
-encode = string.encode()
-print(encode)
+
+class Collection:
+    def __init__(self, database, name):
+        self.database = database
+        self.name = name
+
+    def put(self, key, value) -> None:
+        line = encode_str(self.name, key, value)
+        # with open(self.database.path, 'ab') as data_base:
+        #     data_base.write(line)
+        print(line)
+
+    def get(self, key) -> str:
+        pass
+
+    def delete(self, key):
+        pass
+
+    def query(self, callback):
+        pass
+
+    def contains(self, key):
+        pass
+
+
+if __name__ == '__main__':
+    db = Database('data.db')
+
+    links = db.collection('links')
+    links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
+    links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM')
+
+    # users = db.collection('users')
+    # users.put('alice', 'Alice')
+    # users.put('bob', 'Bob')
+    # user = users.get('alice')
+    # users.delete('bob')
