@@ -47,6 +47,8 @@ def _pack_string(text: str,
 
     return packer
 
+def _pack_status_flag():
+    pass
 
 def decode_row(row: bytes):
     c = 2
@@ -155,18 +157,18 @@ if __name__ == '__main__':
     links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
     # value__ = links.get('polarion')
     # links.get_all()
-    value__ = links.get('polarion')
-    print(value__)
-    value2 = links.get('azure')
-    print(value2)
-
-    users = db.collection('users')
+    # value__ = links.get('polarion')
+    # print(value__)
+    # value2 = links.get('azure')
+    # print(value2)
+    #
+    # users = db.collection('users')
     # users.put('alice', 'Alice')
     # users.put('bob', 'Bob')
-    user = users.get('alice')
-    user2 = users.get('bobby')
-    print(user)
-    print(user2)
+    # user = users.get('alice')
+    # user2 = users.get('bobby')
+    # print(user)
+    # print(user2)
 
     # links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM')
 
