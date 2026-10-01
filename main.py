@@ -4,7 +4,7 @@ ENDIAN = '>'
 UNSIGNED_CHAR = 'B'
 START_SEPARATOR = 3  # STX
 DATA_SEPARATOR = 4  # ETX
-KEY_SEPARATOR = 9  # BS
+KEY_SEPARATOR = 7  # BS
 END_SEPARATOR = 5  # EOT
 TYPE_STR = 10
 
@@ -48,16 +48,39 @@ def _pack_string(text: str,
 
 
 def decode_row(row: bytes):
-    for r in row:
-        if r == START_SEPARATOR or r == KEY_SEPARATOR:
-            print(row[r-1:])
-            print()
-        elif r == DATA_SEPARATOR:
-            continue
-    return row
+    c = 1
+    length = row[c]
+    c += 1
+    name_bin = _unpack_string(data=row[c:c+length], length=length)
+    name = ''
+    for n in name_bin:
+        name = name + str(chr(n))
 
-def _unpack_string():
-    return
+    c += length + 1
+    length = row[c]
+    c += 1
+    key_bin = _unpack_string(data=row[c:c+length], length=length)
+    key = ''
+    for k in key_bin:
+        key = key + str(chr(k))
+
+    c += length + 1
+    if row[c] == TYPE_STR:
+        c += 1
+        length = row[c]
+    c += 1
+    value_bin = _unpack_string(data=row[c:c + length], length=length)
+    value = ''
+    for v in value_bin:
+        value = value + str(chr(v))
+
+    line = f'collection: {name}, key: {key}, value: {value}'
+    return line
+
+def _unpack_string(data: bytes, length: int):
+    length_ = UNSIGNED_CHAR * length
+    unpacker = struct.unpack(f'{ENDIAN}{length_}', data)
+    return unpacker
 
 class Database:
     def __init__(self, path):
