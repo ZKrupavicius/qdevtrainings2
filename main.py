@@ -6,7 +6,7 @@ UNSIGNED_CHAR = 'B'
 START_SEPARATOR = 2  # STX
 DATA_SEPARATOR = 3  # ETX
 END_SEPARATOR = 4  # EOT
-ACTIVE_SEPARATOR = 7  # BEL
+STATUS_SEPARATOR = 7  # BEL
 TYPE_STR = 11  # DC1
 TYPE_INT = 12  # DC2
 
@@ -27,14 +27,14 @@ def _encode_length_and_data(text: str) -> bytes:
 
 
 def encode_string(collection: str, key: str, value: str) -> bytes:
-    packed_row = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
+    packed_row_str = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
         DATA_SEPARATOR) + _encode_length_and_data(key) + _encode_one_char(TYPE_STR) + _encode_length_and_data(
-        value) + _encode_one_char(ACTIVE_SEPARATOR) + _encode_one_char(1) + _encode_one_char(END_SEPARATOR)
+        value) + _encode_one_char(STATUS_SEPARATOR) + _encode_one_char(1) + _encode_one_char(END_SEPARATOR)
 
-    if len(packed_row) > 255:
+    if len(packed_row_str) > 255:
         raise ValueError('Row length out of range')
-    packed_row = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_row)) + packed_row
-    return packed_row
+    packed_row_str = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_row_str)) + packed_row_str
+    return packed_row_str
 
 
 def _encode_integer_data(value: int) -> bytes:
@@ -42,14 +42,14 @@ def _encode_integer_data(value: int) -> bytes:
 
 
 def encode_int(collection: str, key: str, value: int) -> bytes:
-    packed_row = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
+    packed_row_int = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
         DATA_SEPARATOR) + _encode_length_and_data(key) + _encode_one_char(TYPE_INT) + _encode_integer_data(
-        value) + _encode_one_char(ACTIVE_SEPARATOR) + _encode_one_char(1) + _encode_one_char(END_SEPARATOR)
+        value) + _encode_one_char(STATUS_SEPARATOR) + _encode_one_char(1) + _encode_one_char(END_SEPARATOR)
 
-    if len(packed_row) > 255:
+    if len(packed_row_int) > 255:
         raise ValueError('Row length out of range')
-    packed_row = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_row)) + packed_row
-    return packed_row
+    packed_row_int = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_row_int)) + packed_row_int
+    return packed_row_int
 
 
 def decode_row(row: bytes) -> [str, str, str, int]:
@@ -98,7 +98,7 @@ def _unpack_string(data: bytes, length: int):
 def delete_encode_string(collection: str, key: str, value: str) -> bytes:
     packed_string = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
         DATA_SEPARATOR) + _encode_length_and_data(key) + _encode_one_char(TYPE_STR) + _encode_length_and_data(
-        value) + _encode_one_char(ACTIVE_SEPARATOR) + _encode_one_char(0) + _encode_one_char(END_SEPARATOR)
+        value) + _encode_one_char(STATUS_SEPARATOR) + _encode_one_char(0) + _encode_one_char(END_SEPARATOR)
 
     if len(packed_string) > 255:
         raise ValueError('Row length out of range')
