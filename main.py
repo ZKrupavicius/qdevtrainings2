@@ -1,4 +1,5 @@
 import struct
+from pathlib import Path
 
 ENDIAN = '>'
 UNSIGNED_CHAR = 'B'
@@ -84,7 +85,8 @@ def delete_encode_string(collection: str, key: str, value: str) -> bytes:
 
 class Database:
     def __init__(self, path):
-        self.path = path
+        self.path = Path(path)
+        self.path.touch()
 
     def collection(self, name):
         return Collection(self, name)
@@ -103,6 +105,8 @@ class Collection:
     def get(self, key):
         with open(self.database.path, 'rb') as data_base:
             lines = data_base.read()
+        if lines == bytes():
+            raise BufferError('Empty database')
         entries = []
         start_of_line = 0
         for count, line in enumerate(lines):
@@ -137,11 +141,11 @@ if __name__ == '__main__':
     db = Database('data.db')
 
     links = db.collection('links')
-    links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
-    links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM/')
-    value__ = links.get('polarion')
-    print(value__)
-    links.delete('polarion')
+    # links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
+    # links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM/')
+    # value__ = links.get('polarion')
+    # print(value__)
+    # links.delete('polarion')
     value__ = links.get('polarion')
     print(value__)
 
