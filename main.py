@@ -4,87 +4,86 @@ ENDIAN = '>'
 UNSIGNED_CHAR = 'B'
 START_SEPARATOR = 2  # STX
 DATA_SEPARATOR = 3  # ETX
-KEY_SEPARATOR = 7  # BS
 END_SEPARATOR = 4  # EOT
-TYPE_STR = 8
+ACTIVE_SEPARATOR = 7  # BEL
+TYPE_STR = 11  # DC1
 
 
-def encode_row(name, key, value):
-    encoder = _pack_string(text=name, start_of_row=True) + _pack_string(text=key) + _pack_string(text=value,
-                                                                                                 type_needed=True,
-                                                                                                 data_input=True)
-    encoder = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(encoder)) + encoder
-    return encoder
+def _encode_one_char(text: str) -> bytes:
+    return struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', text)
 
 
-def _pack_string(text: str,
-                 type_needed: bool = False,
-                 start_of_row: bool = False,
-                 data_input: bool = False
-                 ) -> bytes:
+def _encode_length_and_data(text: str) -> bytes:
     numbers = []
-    # type_ = TYPE_INT
-    # if isinstance(text, str):
-    type_ = TYPE_STR
     for ch in text:
         numbers.append(ord(ch))
     length = len(numbers)
-    # print(length)
-    length_ = UNSIGNED_CHAR * length
-    if start_of_row:
-        packer = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', START_SEPARATOR)
-    elif data_input:
-        packer = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', DATA_SEPARATOR)
-    else:
-        packer = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', KEY_SEPARATOR)
+    if length > 255:
+        raise ValueError('Data out of range')
+    str_format = UNSIGNED_CHAR * length
+    return struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}{str_format}', length, *numbers)
 
-    if type_needed:
-        packer = packer + struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', type_)
 
-    packer = packer + struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}{length_}', length, *numbers)
-    if type_needed:
-        packer = packer + struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', END_SEPARATOR)
+def encode_string(collection: str, key: str, value: str) -> bytes:
+    packed_string = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
+        DATA_SEPARATOR) + _encode_length_and_data(key) + _encode_one_char(TYPE_STR) + _encode_length_and_data(
+        value) + _encode_one_char(ACTIVE_SEPARATOR) + _encode_one_char(1) + _encode_one_char(END_SEPARATOR)
 
-    return packer
+    if len(packed_string) > 255:
+        raise ValueError('Row length out of range')
+    # print(len(packed_string))
+    packed_string = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_string)) + packed_string
+    return packed_string
 
-def _pack_status_flag():
-    pass
 
-def decode_row(row: bytes):
-    c = 2
-    length = row[c]
-    c += 1
-    name_bin = _unpack_string(data=row[c:c + length], length=length)
-    name = ''
-    for n in name_bin:
-        name = name + str(chr(n))
+def decode_row(row: bytes) -> [str, str, str, int]:
+    pos = 2
+    length = row[pos]
 
-    c += length + 1
-    length = row[c]
-    c += 1
-    key_bin = _unpack_string(data=row[c:c + length], length=length)
-    key = ''
-    for k in key_bin:
-        key = key + str(chr(k))
+    pos, collection = _decode_data_helper(row, length, pos)
 
-    c += length + 1
-    if row[c] == TYPE_STR:
-        c += 1
-        length = row[c]
-    c += 1
-    value_bin = _unpack_string(data=row[c:c + length], length=length)
-    value = ''
-    for v in value_bin:
-        value = value + str(chr(v))
+    pos += length + 1
+    length = row[pos]
 
-    # line = f'collection: {name}, key: {key}, value: {value}'
-    return name, key, value
+    pos, key = _decode_data_helper(row, length, pos)
+
+    pos += length
+    if row[pos] == TYPE_STR:
+        pos += 1
+        length = row[pos]
+
+    pos, value = _decode_data_helper(row, length, pos)
+
+    pos += length + 1
+    status = row[pos]
+
+    return collection, key, value, status
+
+def _decode_data_helper(row: bytes, length: int, pos: int) -> [int, str]:
+    pos += 1
+    text_bin = _unpack_string(data=row[pos:pos + length], length=length)
+    text = ''
+    for c in text_bin:
+        text = text + str(chr(c))
+
+    return pos, text
 
 
 def _unpack_string(data: bytes, length: int):
     length_ = UNSIGNED_CHAR * length
-    unpacker = struct.unpack(f'{ENDIAN}{length_}', data)
-    return unpacker
+    unpacked_string = struct.unpack(f'{ENDIAN}{length_}', data)
+    return unpacked_string
+
+
+def delete_encode_string(collection: str, key: str, value: str) -> bytes:
+    packed_string = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
+        DATA_SEPARATOR) + _encode_length_and_data(key) + _encode_one_char(TYPE_STR) + _encode_length_and_data(
+        value) + _encode_one_char(ACTIVE_SEPARATOR) + _encode_one_char(0) + _encode_one_char(END_SEPARATOR)
+
+    if len(packed_string) > 255:
+        raise ValueError('Row length out of range')
+    packed_string = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_string)) + packed_string
+    return packed_string
 
 
 class Database:
@@ -101,7 +100,7 @@ class Collection:
         self.name = name
 
     def put(self, key, value) -> None:
-        line = encode_row(self.name, key, value)
+        line = encode_string(self.name, key, value)
         # print(line)
         # decoded_bytes = decode_row(line)
         # print(decoded_bytes)
@@ -114,34 +113,29 @@ class Collection:
         entries = []
         start_of_line = 0
         for count, line in enumerate(lines):
-            if line == END_SEPARATOR and count == lines[start_of_line] and (
-                    count + 2 == len(lines) or lines[count + 2] == START_SEPARATOR):
+            # Better validation needed
+            if line == END_SEPARATOR:
                 entries.append(lines[start_of_line:count])
                 start_of_line = count + 1
         # print(entries)
+        correct_entries = []
+        # print(entries)
         for entry in entries:
-            name_, key_, value_ = decode_row(entry)
-            if name_ == self.name and key_ == key:
-                return value_
+            collection_, key_, value_, status_, = decode_row(entry)
+            if collection_ == self.name and key_ == key:
+                correct_entries.append([collection_, key_, value_, status_])
+                # return value_
+
+        # check last input
+        if correct_entries[-1][-1]:
+            return correct_entries[-1][2]
         return 'not found'
 
-    # def get_all(self):
-    #     with open(self.database.path, 'rb') as data_base:
-    #         lines = data_base.read()
-    #     print(lines)
-    #     entries = []
-    #     start_of_line = 0
-    #     for count, line in enumerate(lines):
-    #         if line == END_SEPARATOR:
-    #             entries.append(lines[start_of_line:count])
-    #             start_of_line = count + 1
-    #     print(entries)
-    #     for entry in entries:
-    #         name_, key_, value_ = decode_row(entry)
-    #         print(name_, key_, value_)
-
     def delete(self, key):
-        pass
+        value = links.get(key)
+        line = delete_encode_string(self.name, key, value)
+        with open(self.database.path, 'ab') as data_base:
+            data_base.write(line)
 
     def query(self, callback):
         pass
@@ -155,10 +149,15 @@ if __name__ == '__main__':
 
     links = db.collection('links')
     links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
-    # value__ = links.get('polarion')
+    links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM/')
+    value_ = links.get('polarion')
+    print(value_)
+    links.delete('polarion')
+    value_ = links.get('polarion')
+    print(value_)
+
     # links.get_all()
     # value__ = links.get('polarion')
-    # print(value__)
     # value2 = links.get('azure')
     # print(value2)
     #
@@ -169,8 +168,6 @@ if __name__ == '__main__':
     # user2 = users.get('bobby')
     # print(user)
     # print(user2)
-
-    # links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM')
 
     # users = db.collection('users')
     # users.put('alice', 'Alice')
