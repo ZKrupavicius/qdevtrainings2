@@ -140,7 +140,6 @@ class Collection:
         entries = []
         start_of_line = 0
         for count, line in enumerate(lines):
-            # Better validation needed
             if line == END_SEPARATOR:
                 entries.append(lines[start_of_line:count])
                 start_of_line = count + 1
