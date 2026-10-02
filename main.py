@@ -8,6 +8,7 @@ DATA_SEPARATOR = 3  # ETX
 END_SEPARATOR = 4  # EOT
 ACTIVE_SEPARATOR = 7  # BEL
 TYPE_STR = 11  # DC1
+TYPE_INT = 12  # DC2
 
 
 def _encode_one_char(text: str) -> bytes:
@@ -26,14 +27,29 @@ def _encode_length_and_data(text: str) -> bytes:
 
 
 def encode_string(collection: str, key: str, value: str) -> bytes:
-    packed_string = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
+    packed_row = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
         DATA_SEPARATOR) + _encode_length_and_data(key) + _encode_one_char(TYPE_STR) + _encode_length_and_data(
         value) + _encode_one_char(ACTIVE_SEPARATOR) + _encode_one_char(1) + _encode_one_char(END_SEPARATOR)
 
-    if len(packed_string) > 255:
+    if len(packed_row) > 255:
         raise ValueError('Row length out of range')
-    packed_string = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_string)) + packed_string
-    return packed_string
+    packed_row = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_row)) + packed_row
+    return packed_row
+
+
+def _encode_integer_data(value: int) -> bytes:
+    return struct.pack(f'{ENDIAN}H', value)
+
+
+def encode_int(collection: str, key: str, value: int) -> bytes:
+    packed_row = _encode_one_char(START_SEPARATOR) + _encode_length_and_data(collection) + _encode_one_char(
+        DATA_SEPARATOR) + _encode_length_and_data(key) + _encode_one_char(TYPE_INT) + _encode_integer_data(
+        value) + _encode_one_char(ACTIVE_SEPARATOR) + _encode_one_char(1) + _encode_one_char(END_SEPARATOR)
+
+    if len(packed_row) > 255:
+        raise ValueError('Row length out of range')
+    packed_row = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_row)) + packed_row
+    return packed_row
 
 
 def decode_row(row: bytes) -> [str, str, str, int]:
@@ -46,15 +62,22 @@ def decode_row(row: bytes) -> [str, str, str, int]:
     pos, key = _decode_data_helper(row, length, pos)
 
     pos += length
+    value = None
     if row[pos] == TYPE_STR:
         pos += 1
         length = row[pos]
-    pos, value = _decode_data_helper(row, length, pos)
+        pos, value = _decode_data_helper(row, length, pos)
+        pos += length + 1
+    elif row[pos] == TYPE_INT:
+        pos += 1
+        value = struct.unpack(f'{ENDIAN}H', row[pos:pos+2])
+        pos +=2
+        value = value[0]
 
-    pos += length + 1
     status = row[pos]
 
     return collection, key, value, status
+
 
 def _decode_data_helper(row: bytes, length: int, pos: int) -> [int, str]:
     pos += 1
@@ -98,11 +121,18 @@ class Collection:
         self.name = name
 
     def put(self, key, value) -> None:
-        line = encode_string(self.name, key, value)
+        line = bytes()
+        if type(value) == str:
+            line = encode_string(self.name, key, value)
+        elif type(value) == int:
+            line = encode_int(self.name, key, value)
+
+        if line == bytes():
+            raise ValueError('empty row')
         with open(self.database.path, 'ab') as data_base:
             data_base.write(line)
 
-    def get(self, key):
+    def get(self, key: str) -> str:
         with open(self.database.path, 'rb') as data_base:
             lines = data_base.read()
         if lines == bytes():
@@ -124,8 +154,8 @@ class Collection:
             return correct_entries[-1][2]
         return 'not found'
 
-    def delete(self, key):
-        value = links.get(key)
+    def delete(self, key: str) -> None:
+        value = self.get(key)
         line = delete_encode_string(self.name, key, value)
         with open(self.database.path, 'ab') as data_base:
             data_base.write(line)
@@ -133,21 +163,33 @@ class Collection:
     def query(self, callback):
         pass
 
-    def contains(self, key):
-        pass
+    def contains(self, key: str) -> bool:
+        value = self.get(key)
+        if value != 'not found':
+            return True
+        return False
 
 
 if __name__ == '__main__':
     db = Database('data.db')
 
     links = db.collection('links')
-    # links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
+    links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
     # links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM/')
-    # value__ = links.get('polarion')
-    # print(value__)
-    # links.delete('polarion')
+    link = links.get('polarion')
+    print(link)
+    link = links.contains('polarion')
+    print(link)
+    links.delete('polarion')
     value__ = links.get('polarion')
-    print(value__)
+    print(link)
+    link = links.contains('polarion')
+    print(link)
+
+    users = db.collection('users')
+    users.put('alice', 30)
+    user = users.get('alice')
+    print(user)
 
     # links.get_all()
     # value__ = links.get('polarion')
