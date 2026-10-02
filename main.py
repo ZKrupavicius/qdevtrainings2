@@ -187,7 +187,7 @@ if __name__ == '__main__':
     print(link)
 
     users = db.collection('users')
-    users.put('alice', 30)
+    users.put('alice', 10000)
     user = users.get('alice')
     print(user)
 
