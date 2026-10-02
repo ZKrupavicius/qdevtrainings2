@@ -31,7 +31,6 @@ def encode_string(collection: str, key: str, value: str) -> bytes:
 
     if len(packed_string) > 255:
         raise ValueError('Row length out of range')
-    # print(len(packed_string))
     packed_string = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_string)) + packed_string
     return packed_string
 
@@ -39,19 +38,16 @@ def encode_string(collection: str, key: str, value: str) -> bytes:
 def decode_row(row: bytes) -> [str, str, str, int]:
     pos = 2
     length = row[pos]
-
     pos, collection = _decode_data_helper(row, length, pos)
 
     pos += length + 1
     length = row[pos]
-
     pos, key = _decode_data_helper(row, length, pos)
 
     pos += length
     if row[pos] == TYPE_STR:
         pos += 1
         length = row[pos]
-
     pos, value = _decode_data_helper(row, length, pos)
 
     pos += length + 1
@@ -101,9 +97,6 @@ class Collection:
 
     def put(self, key, value) -> None:
         line = encode_string(self.name, key, value)
-        # print(line)
-        # decoded_bytes = decode_row(line)
-        # print(decoded_bytes)
         with open(self.database.path, 'ab') as data_base:
             data_base.write(line)
 
@@ -117,16 +110,12 @@ class Collection:
             if line == END_SEPARATOR:
                 entries.append(lines[start_of_line:count])
                 start_of_line = count + 1
-        # print(entries)
         correct_entries = []
-        # print(entries)
         for entry in entries:
             collection_, key_, value_, status_, = decode_row(entry)
             if collection_ == self.name and key_ == key:
                 correct_entries.append([collection_, key_, value_, status_])
-                # return value_
 
-        # check last input
         if correct_entries[-1][-1]:
             return correct_entries[-1][2]
         return 'not found'
@@ -150,11 +139,11 @@ if __name__ == '__main__':
     links = db.collection('links')
     links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
     links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM/')
-    value_ = links.get('polarion')
-    print(value_)
+    value__ = links.get('polarion')
+    print(value__)
     links.delete('polarion')
-    value_ = links.get('polarion')
-    print(value_)
+    value__ = links.get('polarion')
+    print(value__)
 
     # links.get_all()
     # value__ = links.get('polarion')
