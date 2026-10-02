@@ -152,7 +152,7 @@ class Collection:
 
         if correct_entries[-1][-1]:
             return correct_entries[-1][2]
-        return 'not found'
+        return 'Value not found'
 
     def delete(self, key: str) -> None:
         value = self.get(key)
@@ -165,7 +165,7 @@ class Collection:
 
     def contains(self, key: str) -> bool:
         value = self.get(key)
-        if value != 'not found':
+        if value != 'Value not found':
             return True
         return False
 
@@ -181,7 +181,7 @@ if __name__ == '__main__':
     link = links.contains('polarion')
     print(link)
     links.delete('polarion')
-    value__ = links.get('polarion')
+    link = links.get('polarion')
     print(link)
     link = links.contains('polarion')
     print(link)
