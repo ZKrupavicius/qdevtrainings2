@@ -142,20 +142,22 @@ class Collection:
 
         while pos < len(data):
             record_length = data[pos]
-            record_start = pos
-            record_end = pos + 1 + record_length
+            record_end = data.find(END_SEPARATOR, pos + 1)
 
-            if record_end > len(data):
+            if record_end == -1:
                 break
 
-            entry = data[record_start:record_end]
+            entry = data[pos:record_end + 1]
+            actual_length = len(entry) - 1
 
-            if entry[-1] != END_SEPARATOR:
-                pos = record_end
+            if record_length != actual_length:
+                pos = record_end + 1
                 continue
 
+            # print(entry)
+
             entries.append(entry)
-            pos = record_end
+            pos = record_end + 1
 
         return entries
 
@@ -218,23 +220,23 @@ if __name__ == '__main__':
     db = Database('data.db')
 
     links = db.collection('links')
-    links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
-    links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM/')
+    # links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
+    # links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM/')
+    # link = links.get('polarion')
+    # print(link)
+    # link = links.contains('polarion')
+    # print(link)
+    # links.delete('polarion')
+    # links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
     link = links.get('polarion')
     print(link)
-    link = links.contains('polarion')
-    print(link)
-    links.delete('polarion')
-    links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
-    link = links.get('polarion')
-    print(link)
-    link = links.contains('polarion')
-    print(link)
+    # link = links.contains('polarion')
+    # print(link)
 
-    users = db.collection('users')
-    users.put('alice', 10000)
-    user = users.get('alice')
-    print(user)
+    # users = db.collection('users')
+    # users.put('alice', 10000)
+    # user = users.get('alice')
+    # print(user)
 
     result = links.query(lambda link: link.startswith('http'))
     print(result)
