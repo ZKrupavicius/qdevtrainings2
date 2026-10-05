@@ -149,6 +149,11 @@ class Collection:
                 break
 
             entry = data[record_start:record_end]
+
+            if entry[-1] != END_SEPARATOR:
+                pos = record_end
+                continue
+
             entries.append(entry)
             pos = record_end
 
@@ -220,6 +225,7 @@ if __name__ == '__main__':
     link = links.contains('polarion')
     print(link)
     links.delete('polarion')
+    links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
     link = links.get('polarion')
     print(link)
     link = links.contains('polarion')
