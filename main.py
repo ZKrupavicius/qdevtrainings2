@@ -1,8 +1,10 @@
 import struct
 from pathlib import Path
+from typing import Callable, Union, List
 
 ENDIAN = '>'
 UNSIGNED_CHAR = 'B'
+UNSIGNED_SHORT = 'H'
 START_SEPARATOR = 2  # STX
 DATA_SEPARATOR = 3  # ETX
 END_SEPARATOR = 4  # EOT
@@ -38,7 +40,7 @@ def encode_string(collection: str, key: str, value: str) -> bytes:
 
 
 def _encode_integer_data(value: int) -> bytes:
-    return struct.pack(f'{ENDIAN}H', value)
+    return struct.pack(f'{ENDIAN}{UNSIGNED_SHORT}', value)
 
 
 def encode_int(collection: str, key: str, value: int) -> bytes:
@@ -70,8 +72,8 @@ def decode_row(row: bytes) -> [str, str, str, int]:
         pos += length + 1
     elif row[pos] == TYPE_INT:
         pos += 1
-        value = struct.unpack(f'{ENDIAN}H', row[pos:pos+2])
-        pos +=2
+        value = struct.unpack(f'{ENDIAN}{UNSIGNED_SHORT}', row[pos:pos + 2])
+        pos += 2
         value = value[0]
 
     status = row[pos]
@@ -159,22 +161,52 @@ class Collection:
         with open(self.database.path, 'ab') as data_base:
             data_base.write(line)
 
-    def query(self, callback):
-        pass
-
     def contains(self, key: str) -> bool:
         value = self.get(key)
         if value != 'Value not found':
             return True
         return False
 
+    def query(self, fn: Callable[[Union[int, str]], bool]) -> List[Union[int, str]]:
+
+        with open(self.database.path, 'rb') as data_base:
+            lines = data_base.read()
+        if lines == bytes():
+            raise BufferError('Empty database')
+        entries = []
+        start_of_line = 0
+        for count, line in enumerate(lines):
+            if line == END_SEPARATOR:
+                entries.append(lines[start_of_line:count])
+                start_of_line = count + 1
+
+        correct_entries = []
+        for entry in entries:
+            collection_, key_, value_, status_ = decode_row(entry)
+            if collection_ == self.name:
+                correct_entries.append([collection_, key_, value_, status_])
+
+        latest_entries = {}
+        for entry in correct_entries:
+            key_ = entry[1]
+            latest_entries[key_] = entry
+
+        results = []
+        for entry in latest_entries.values():
+            value_ = entry[2]
+            status_ = entry[3]
+
+            if status_ and fn(value_):
+                results.append(value_)
+
+        return results
 
 if __name__ == '__main__':
     db = Database('data.db')
 
     links = db.collection('links')
     links.put('polarion', 'https://polarion.gpdm.fmcglobal.net/polarion/')
-    # links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM/')
+    links.put('azure', 'https://dev.azure.com/FreseniusMedicalCare/VSM/')
     link = links.get('polarion')
     print(link)
     link = links.contains('polarion')
@@ -189,6 +221,9 @@ if __name__ == '__main__':
     users.put('alice', 10000)
     user = users.get('alice')
     print(user)
+
+    result = links.query(lambda link: link.startswith('http'))
+    print(result)
 
     # links.get_all()
     # value__ = links.get('polarion')
