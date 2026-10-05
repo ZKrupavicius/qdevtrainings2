@@ -107,7 +107,6 @@ def delete_encode_string(collection: str, key: str, value: str) -> bytes:
     packed_string = struct.pack(f'{ENDIAN}{UNSIGNED_CHAR}', len(packed_string)) + packed_string
     return packed_string
 
-
 class Database:
     def __init__(self, path):
         self.path = Path(path)
@@ -134,17 +133,32 @@ class Collection:
         with open(self.database.path, 'ab') as data_base:
             data_base.write(line)
 
-    def get(self, key: str) -> str:
+    def _read_entries(self):
         with open(self.database.path, 'rb') as data_base:
-            lines = data_base.read()
-        if lines == bytes():
-            raise BufferError('Empty database')
+            data = data_base.read()
+
         entries = []
-        start_of_line = 0
-        for count, line in enumerate(lines):
-            if line == END_SEPARATOR:
-                entries.append(lines[start_of_line:count])
-                start_of_line = count + 1
+        pos = 0
+
+        while pos < len(data):
+            record_length = data[pos]
+            record_start = pos
+            record_end = pos + 1 + record_length
+
+            if record_end > len(data):
+                break
+
+            entry = data[record_start:record_end]
+            entries.append(entry)
+            pos = record_end
+
+        return entries
+
+    def get(self, key: str) -> str:
+        entries = self._read_entries()
+        if not entries:
+            raise BufferError('Empty database')
+
         correct_entries = []
         for entry in entries:
             collection_, key_, value_, status_, = decode_row(entry)
@@ -168,17 +182,10 @@ class Collection:
         return False
 
     def query(self, fn: Callable[[Union[int, str]], bool]) -> List[Union[int, str]]:
+        entries = self._read_entries()
 
-        with open(self.database.path, 'rb') as data_base:
-            lines = data_base.read()
-        if lines == bytes():
+        if not entries:
             raise BufferError('Empty database')
-        entries = []
-        start_of_line = 0
-        for count, line in enumerate(lines):
-            if line == END_SEPARATOR:
-                entries.append(lines[start_of_line:count])
-                start_of_line = count + 1
 
         correct_entries = []
         for entry in entries:
@@ -200,6 +207,7 @@ class Collection:
                 results.append(value_)
 
         return results
+
 
 if __name__ == '__main__':
     db = Database('data.db')
